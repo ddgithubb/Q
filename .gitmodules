@@ -1,0 +1,12 @@
+[submodule "api-server"]
+	path = api-server
+	url = https://github.com/ddgithubb/Q-api-server
+[submodule "desktop-app"]
+	path = desktop-app
+	url = https://github.com/ddgithubb/Q-desktop-app
+[submodule "sync-server"]
+	path = sync-server
+	url = https://github.com/ddgithubb/Q-sync-server
+[submodule "cluster-tree"]
+	path = cluster-tree
+	url = https://github.com/ddgithubb/cluster-tree
