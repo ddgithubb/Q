@@ -1,0 +1,3 @@
+- performance issues with connecting/making rtcpeerconnection. 5 second may be not enough time if there is a lot of connects (check for curConnects?)
+- shouldn't disocnnect neighoburing nodes before connecting to new ones
+- datachannel.onopen is asymetric, getting readystate isn't 100% accurate when comparing both nodes

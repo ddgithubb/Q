@@ -1,0 +1,3 @@
+- Integrate rest of reports
+- Hash verification for files
+- Add caching options for client (both messages and file shards)
