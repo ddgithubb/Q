@@ -1,3 +1,70 @@
+- WE NOW HAVE CONSISTENT PATH INFORMATION! Fix dest
+
+- Initial "Enter display name"
+    - Temporarily allow dynamic users (or implement in websocket)
+- https://github.com/paullouisageneau/datachannel-wasm
+    - Increase cache size and all that (try 256kb vs 1mb)
+    - If so, do not differentiate chunkSize and cacheChunkSize
+
+- PUT ON EC2 AND TEST (PROTOTYPE DONE!)
+
+- Desktop app and mobile app (IMPORTANT!)
+    - Rewrite cache lgoic (in webworker)
+    - Store messages on phone (only messages that the devices was there for)
+        - Add get more from devices features and add messaging caching feature
+    - STORE BY CREATED (also in messages, so that merge/download history will be easier)
+    - DOWNLOAD HISTORY
+    - Store fileOffers / filePath
+    - Add folder support
+- Authetication System
+- Multiple pools/User profile
+- DeviceType / device name differentiation in messagesView
+
+- REWRITE WEBRTC/POOLCLIENT STUFF IN C++/RUST USING WASM/C++ addons nodejs
+    - https://github.com/bobbiec/react-wasm-demo
+    - https://github.com/murat-dogan/node-datachannel?ref=morioh.com&utm_source=morioh.com
+    - https://rustwasm.github.io/wasm-bindgen/examples/webrtc_datachannel.html
+
+- Build won auth system (avoid lock in)
+- CoackroachDB
+    - This should be a good choice given authentication nature
+- Custom NewSQL on rocksDB (rust or c++)
+
+- NOTIFICATIONS
+    - NOT dedicated, they are just optional tags to add if you want to notify people of your message
+    - Should not break the concept of "Data being stored on server/going through server unless specified"
+- Finish designing rest of login/profile/intro page
+- SHOULD ONLY BE ABLE TO CONNECT TO ONE POOL AT A TIME
+    - Automatic connects/disconnects
+
+- Possible missed messages (true if some node has logged on since last)
+- Broadcasting live media but only one track? 
+    - Consider what useful applications this could have. Broadcasting?
+- Whispers
+    - end to end encrypted?
+- Save messages
+- Retract messages
+    - Delete downloads/retry
+- Announcements
+- Auth + Device management
+
+- Folder. Tar in webworker
+- Store fileOffer/fileID/file/whatever
+    - Check if file still exists when starting AND when starting to send/remove fileoffer
+    - ONLY FOR APPS (MOBILE | DESKTOP, NOT SITE)
+- Performance tests
+- Device performance requirements (including nat traversal consideration, encoding/decoding, and internet speed)
+- Add Folder support Drag and Drop (Tarring, but performance could suffer)
 - Integrate rest of reports
+    - Mostly fraud detection
+    - Report should count retries (3 times and you're out type deal)
+- Security for important messages (possibly involving a majority rule)
 - Hash verification for files
-- Add caching options for client (both messages and file shards)
+    - How to overcome checksum security/hashing time
+    - Either mapreduce it, OR have an option to have extra verification process (extra X time to download/upload)
+- Interactive board/white board etc. (send in chunks, when user lifts off)
+
+- Test broadcasting live media (mainly audio + pictures as video is just simply too big for upload)
+    - Not that it isn't possible, but there are serious performance impacts to be considered
+    - addTrack requires renegotiation, and if we add a track for every node, it will be costly on every aspect
+    - An MCU/SFU is also bad becuase it will be impossible to filter own node media when data eventually reaches to them
