@@ -1,0 +1,146 @@
+syntax = "proto3";
+
+package pool.v1;
+
+enum PoolMediaType {
+    IMAGE = 0;
+}
+
+enum PoolNodeState {
+    INACTIVE = 0;
+    ACTIVE = 1;
+}
+
+message PoolFileInfo {
+    string file_id = 1;
+    string file_name = 2;
+    int64 total_size = 3;
+    string origin_node_id = 4;
+}
+
+message PoolFileSeeders {
+    PoolFileInfo file_info = 1;
+    repeated string seeder_node_ids = 2;
+}
+
+message PoolImageData {
+    int32 width = 1;
+    int32 height = 2;
+    string preview_image_base64 = 3;
+}
+
+message PoolMessage {
+
+    enum Type {
+        NODE_STATE = 0;
+        LATEST_REQUEST = 1;
+        LATEST_REPLY = 2;
+        TEXT = 3;
+        FILE_OFFER = 4;
+        MEDIA_OFFER = 5;
+        FILE_REQUEST = 6;
+        MEDIA_HINT_REQUEST = 7;
+        RETRACT_FILE_OFFER = 8;
+        RETRACT_FILE_REQUEST = 9;
+    }
+
+    string msg_id = 1;
+    Type type = 2;
+    string user_id = 3;
+    int64 created = 4;
+    oneof data {
+        NodeStateData node_state_data = 5;
+        LatestRequestData latest_request_data = 6;
+        LatestReplyData latest_reply_data = 7;
+        TextData text_data = 8;
+        FileOfferData file_offer_data = 9;
+        MediaOfferData media_offer_data = 10;
+        FileRequestData file_request_data = 11;
+        MediaHintRequestData media_hint_request_data = 12;
+        RetractFileOfferData retract_file_offer_data = 13;
+        RetractFileRequestData retract_file_request_data = 14;
+    }
+
+    message NodeStateData {
+        string node_id = 1;
+        string user_id = 2;
+        PoolNodeState state = 3;
+    }
+
+    message LatestRequestData {
+        bool messages_only = 1;
+        string last_message_id = 2;
+        repeated PoolMessage missed_messages = 3;
+        repeated FileOfferData init_file_offers = 4;
+    }
+
+    message LatestReplyData {
+        repeated PoolMessage messages = 1;
+        repeated PoolFileSeeders file_seeders = 2;
+    }
+
+    message TextData {
+        string text = 1;
+    }
+
+    message FileOfferData {
+        PoolFileInfo file_info = 1;
+        string seeder_node_id = 2;
+    }
+
+    message MediaOfferData {
+        FileOfferData file_offer = 1;
+        PoolMediaType media_type = 2;
+        string extension = 3;
+        oneof media_data {
+            PoolImageData image_data = 4;
+        }
+    }
+
+    message FileRequestData {
+        string file_id = 1;
+        string requesting_node_id = 2;
+        repeated int64 chunks_missing = 3;
+        repeated int64 promised_cache_chunks = 4;
+    }
+    
+    message MediaHintRequestData {
+        string file_id = 1;
+    }
+
+    message RetractFileOfferData {
+        string file_id = 1;
+        string node_id = 2;
+    }
+
+    message RetractFileRequestData {
+        string file_id = 1;
+        string requesting_node_id = 2;
+    }
+
+}
+
+message PoolFileChunkMessage {
+    string file_id = 1;
+    int64 chunk_number = 2;
+    bytes chunk = 3;
+}
+
+message PoolMessagePackage {
+    
+    message SourceInfo {
+        string node_id = 1;
+        repeated int32 path = 2; 
+    }
+
+    message DestinationInfo {
+        string node_id = 1;
+        bool visited = 2;
+    }
+
+    SourceInfo src = 1;
+    repeated DestinationInfo dests = 2;
+    optional int32 partner_int_path = 3;
+    optional PoolMessage msg = 4;
+    optional PoolFileChunkMessage file_chunk_msg = 5;
+}

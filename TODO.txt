@@ -1,29 +1,106 @@
-- WE NOW HAVE CONSISTENT PATH INFORMATION! Fix dest
+- Change everything to Protobuf
+    - Websocket
+        - Get rid of targetNodeID or find better solution to whole thing
+        - Use enums instead of codes?
+    - WebRTC (Should keep compatability between browser and desktop for testing)
+        - Refactor to not have a received parameter
+        - Just store messages from last promoted
 
-- Initial "Enter display name"
-    - Temporarily allow dynamic users (or implement in websocket)
-- https://github.com/paullouisageneau/datachannel-wasm
-    - Increase cache size and all that (try 256kb vs 1mb)
-    - If so, do not differentiate chunkSize and cacheChunkSize
+- Performance test rust libraries
+    - webrtc-rs
+    - go pion
+- TAURI confirmed for now
 
-- PUT ON EC2 AND TEST (PROTOTYPE DONE!)
+- Install firefox
 
 - Desktop app and mobile app (IMPORTANT!)
-    - Rewrite cache lgoic (in webworker)
+    - Require good decoupling
+        - UI, Disk Manager, Pool Client, Communication
+        - Such that either or can be replaced
+    - Use Tauri? (Allow for rust core and reactjs ui)
+        - Well DOCUMENTED
+        - BENCHMARK ALL THE BELOW (also helps with practicing rust)
+        - Problem is webrtc-rs performance is bad
+        - Can use libp2p (QUIC, though tcp seems to perform better)
+            - Traditional hole punching not supported so no.
+        - Can build own hole punching with raw TCP/UDP
+            - See how libp2p does it
+        - https://github.com/lerouxrgd/datachannel-rs
+            - rust bindings to c++ libdatachannel and no overhead
+            - still have to test vs tcp hole punching
+        - PION is very fast, but no bindings
+    - For file reading, at 64kb, shouldn't be too much impact on reading bigger chunks
+    - USE tcp/udp hole punching?
+        - OR find better webrtc datachannel implementation and use that...
+        - You don't need wasm if it's an application, just bind GUI
+    - USE PROTOBUF
+    - Use gRPC for rpcs
+    - Rewrite cache logic
     - Store messages on phone (only messages that the devices was there for)
         - Add get more from devices features and add messaging caching feature
+    - Devices data sync (using device pool)
     - STORE BY CREATED (also in messages, so that merge/download history will be easier)
     - DOWNLOAD HISTORY
     - Store fileOffers / filePath
     - Add folder support
+    - Allow copy image / drag and drop
 - Authetication System
+    - Webauthn
+        - Private key should be securely stored on user device
+            - Maybe even password/pin/biometrics/authenticator protected!
+            - Not necessarily password, but something that the device has (like PIN) and connect it to there
+                - navigate.credentials but not on browser
+        - Multiple devices that want to register under one user must link from any other device
+            - Via authenticator apps?
+            - Via physical authenticator?
+            - Point is it needs some connecting device to validate
+            - There needs to be a default way of doing it without using 3rd party authenticators
+                - Do webauthn flow on any device, except instead of the registered device sending
+                  the encrypted code back, transfer the TEMPORARY code (using QR code?) to new device
+                  and the new device registers WITH that TEMPORARY code to verify it is a user 
+        - Temporary logins
+            - It would just be the same exact thing as adding a device
+            - The only thing "temporary" is that you can delete the device
+            - You could even set a timelimit feature or smth
+- Build a small database for sync-server for any important information
+    - RocksDB 
+- Clustered-sync-servers with RAFT
+    - If open sourced, you need to be able to have high availability (as an option)
+    - Built in STUN server
+    - Pebble for DB engine
+        - Sync-server for some pool should be available 3 times
+        - The database will be connected with these servers
+            - So if all 3 sync servers go down, no data/service will be available
+    - RATE LIMIT
 - Multiple pools/User profile
 - DeviceType / device name differentiation in messagesView
+- Report nodes system
+    - Credibility score system (research)
+
+- Slowly transition from web 2.0 to web 3.0
+    - Possibly to start with a cluster of sync-servers with RAFT for data sync
+- BUILD AROUND web 3.0 (own servers/auth system)
+    - Use webauthn + biometrics (try not to use phone numbers)
+    - Allow sync server instances
+    - No need for databases
+        - Databases are made of your devices!
+    - Blockchain for identification? (NO GAS)
+    - Decentralized notification system!
+        - Running your own notification instance, so sync-servers can connect to you
+        - Push notifications
 
 - REWRITE WEBRTC/POOLCLIENT STUFF IN C++/RUST USING WASM/C++ addons nodejs
     - https://github.com/bobbiec/react-wasm-demo
     - https://github.com/murat-dogan/node-datachannel?ref=morioh.com&utm_source=morioh.com
+    - https://github.com/paullouisageneau/datachannel-wasm
     - https://rustwasm.github.io/wasm-bindgen/examples/webrtc_datachannel.html
+    - https://tkat0.github.io/posts/how-to-create-a-react-app-with-rust-and-wasm
+        - Using above 2 links, you can rewrite all of poolclient (supports websockets)
+        - Need to figure out performance implications from passing data between
+
+
+
+BRAINSTORM NOTES:
 
 - Build won auth system (avoid lock in)
 - CoackroachDB

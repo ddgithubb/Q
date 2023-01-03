@@ -1,20 +1,13 @@
-- Should allow broadcast for all Nodes whether new node/user was added to pool 
-    - As long as the operation occurs in a different go routine, shouldn't be too blocking
-    - Adding users in the future will be from a socket anyways (different go routine)
-    - You will have to implement in this future anyways as it is a MAJOR security benefit
-        - No "fradulent" disconnects (client will know exactly what is connected/not connected)
-    - Careful with new client implementation
-        - Slight problem:
-            - We don't want newNode to be firing everytime a node opens a connection
-            - Needs to keep track of whether or not node is connected to cluster
-            - SOLUTION 1: Report Node will eventually lead to node disconnect which leads to removal of node (which then you remove node)
-                - MEANING, we assume node is added when node joins (broadcast ON JOIN)
-                - This won't lead to spam as all nodes past this point are verified anyways
-                - NO NEED FOR SIGNAL_STATUS, make sure when node added, there is a timestamp
-        - Especially in onopen where getLatest might not have gotten the node
+- Symmetric doesn't mean STUN server can't do it 
+    - https://www.frozenmountain.com/hs-fs/hubfs/4%20-%20blog%20images/Turn%20Stun%20chart.png?width=1118&name=Turn%20Stun%20chart.png
+
+- Chunksmissing will fire at the beginning if there is congestion
+    - How to not do this as it will cause more congestion WITHOUT removing chunksMissing request
+        - Because then if the node offerer never got the request, it'll never send
+        - IT also wouldn't be helpful to delay the chunksMissing timer (same problem)
+    - Need a congestion detector to accomodate/predict whether or not node has gotten the request
 
 - Remove all "as ___" that isn't casting
 - Sync server websocket write concurrency error
+    - Should be fixed
 - Better aggregation to reduce code in pool-client
-- msg.TargetNodeID is just terrible design... get rid of it
-- Allow copy image / drag and drop

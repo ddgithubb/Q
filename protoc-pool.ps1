@@ -1,0 +1,1 @@
+protoc --plugin=protoc-gen-ts_proto=.\site-app\node_modules\.bin\protoc-gen-ts_proto.cmd --ts_proto_opt=esModuleInterop=true --ts_proto_out=./site-app/src/pool ./pool.v1.proto
