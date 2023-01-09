@@ -1,19 +1,14 @@
-- Change everything to Protobuf
-    - Websocket
-        - Get rid of targetNodeID or find better solution to whole thing
-        - Use enums instead of codes?
-    - WebRTC (Should keep compatability between browser and desktop for testing)
-        - Refactor to not have a received parameter
-        - Just store messages from last promoted
 
 - Performance test rust libraries
     - webrtc-rs
     - go pion
 - TAURI confirmed for now
 
-- Install firefox
-
 - Desktop app and mobile app (IMPORTANT!)
+    - Try to have some documentation for the more difficult to understand parts!
+    - For SORT functions, use insertion sort for <= 10 elements
+        - Also insertion sort is good for ALMOST sorted arrays...
+        - which is very applicable to this sort of application
     - Require good decoupling
         - UI, Disk Manager, Pool Client, Communication
         - Such that either or can be replaced
@@ -33,7 +28,6 @@
     - USE tcp/udp hole punching?
         - OR find better webrtc datachannel implementation and use that...
         - You don't need wasm if it's an application, just bind GUI
-    - USE PROTOBUF
     - Use gRPC for rpcs
     - Rewrite cache logic
     - Store messages on phone (only messages that the devices was there for)
@@ -43,7 +37,17 @@
     - DOWNLOAD HISTORY
     - Store fileOffers / filePath
     - Add folder support
-    - Allow copy image / drag and drop
+    - Allow copy image / drag and drop    
+    - Benchmark seek write seek write seek write vs append only
+    - Benchmark read/write buffer sizes
+    - Report nodes system
+        - Verify identity of message (relative to src node using public private keys)
+            - This is why chunksMissing shouldn't have promisedChunks
+                - Should be at least one way to garauntee the request going through
+                - promisedChunks is just a one time optimization trick taht will work if all nodes are compliant
+            - Also implement a system to check that nodes are actually sending messages
+                - What happens if a request never gets a reply, how do we know which node to blame
+        - Credibility score system (research)
 - Authetication System
     - Webauthn
         - Private key should be securely stored on user device
@@ -74,8 +78,15 @@
     - RATE LIMIT
 - Multiple pools/User profile
 - DeviceType / device name differentiation in messagesView
-- Report nodes system
-    - Credibility score system (research)
+- Streaming, using architecture with node in the center
+    - Allowing creators to issue their own servers control their own content
+    - They become the central node outputting to 9 nodes
+        - Assuming an upload requires 10mb/s, that's 90 mb/s!
+            - That's a problem
+        - Possibly only outputting to 3 nodes and but quickly switching when
+        node fails?
+    - Their own servers handle authorization via monetization
+    - REQUIRES GOOD RELIABILITY AND REPORT SERVICE
 
 - Slowly transition from web 2.0 to web 3.0
     - Possibly to start with a cluster of sync-servers with RAFT for data sync

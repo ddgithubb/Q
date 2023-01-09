@@ -1,11 +1,16 @@
 - Symmetric doesn't mean STUN server can't do it 
     - https://www.frozenmountain.com/hs-fs/hubfs/4%20-%20blog%20images/Turn%20Stun%20chart.png?width=1118&name=Turn%20Stun%20chart.png
 
+- Possible alternative way rather than dests.visited? 
+
 - Chunksmissing will fire at the beginning if there is congestion
     - How to not do this as it will cause more congestion WITHOUT removing chunksMissing request
         - Because then if the node offerer never got the request, it'll never send
         - IT also wouldn't be helpful to delay the chunksMissing timer (same problem)
     - Need a congestion detector to accomodate/predict whether or not node has gotten the request
+
+- Also seems to be a bit of blocking going on SOMETIMES when getting from cache
+    - Unknown if the cache is what's causing it, but never happens without cache
 
 - Remove all "as ___" that isn't casting
 - Sync server websocket write concurrency error
