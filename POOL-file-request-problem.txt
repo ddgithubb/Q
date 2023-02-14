@@ -1,0 +1,48 @@
+- Pre-notes:
+    - The goal isn't to get rid of the lock for file download because in the
+      grand scheme of things, that lock isn't slowing us down especially since
+      our chunk handler is unbounded
+    - What we should definitely not be doing is physically writing the data
+      twice. Once for file download and once for cache chunks
+    - Becuase of the restriction above, chunks_downloaded should definitely
+      have a lock so promised chunks can get access to it
+
+- ISSUES:
+    - (DONE) Currently, ALL temp files/file offers/downloaded files will open a file handle
+      as a file sender EVEN if no requests are being made (on a std thread)
+        - Need to make sure thread is only spawned on request
+        - Along with this. Don't use channels for file requests, just use a mutex
+            - Channels are in general much slower, and you don't need to communication
+              aspect of channels
+    - (DONE) Current temp/media file offers
+        - Sending a hint makes all nodes with the media to respond
+            - What's the difference between this and simply doing normal file offers
+            - The only real difference is that we can store the seeder as an option
+            - Also when the cacher decides to delete from queue, then it has to send 
+              a retract file offer for each temp file it deletes
+                - NOTE: batching will not increase performance
+            - Especially if more than 1 node requests for hint, that's already the equivalent
+              of doing file offers, then 
+            - Also if no hinter node ids, we can put the logic of the retries and everything
+              all in the chunk_handler (without having to manage a lock and everything)
+                - On initial download, find a seeder node id and send based on that
+                  - Finding seeder node id should function in pool_state
+                - On every chunks missing interval, find a new seeder node id and then
+                  send
+            - Make sure to update complete file download
+    - (DONE) Chunks missing should be 1 second poll, but should be on 5 second intervals before
+      sending another. Mass sending will not help (similar to tcp congestion control)
+        - No need for exponential backoff though
+    - (DONE) How does file request know when to toggle the request_from_origin flag
+        - Especially if it cycles through differente seeders, just beucase 1 seeder
+          failed doesn't mean it is untrustworthy/the path is untrustworthy
+        - Request from origin is mainly if you know the nodes in between are
+          not sending the promised chunks. Which you can never tell since you don't 
+          know what they promised you... 
+        - Actually, since retries are based on no progress, we can use request_from_origin
+          on the last retry
+            - Not a terrible idea. Especially considering the fact that if you send a request
+              via a path, and the path is actually valid, then you will get your chunks
+            - But why not just switch to another seeder especially since you don't know the 
+              real cause of why the original seeder wasn't sending any chunks
+            - Ok implement this for now until further notice

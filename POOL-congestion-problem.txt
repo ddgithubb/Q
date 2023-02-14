@@ -1,0 +1,259 @@
+CURRENT IDEA:
+
+
+
+- Rethink Buffer strategy, because of buffer closes:
+    - NOTE webrtc-rs doesn't have strict buffer size (doesn't really matter since the lost buffer is still a big deal)
+    - CURRENT buffer does 2 things:
+        - Allows overflow (which isn't an issue with webrtc-rs)
+        - When data channel closes, the pool managed buffer can send the buffer to new DC
+    - PROBLEM:
+        - In order for DC to work efficeintly, it needs a buffer of at least 512kb MINIMUM
+            - The point is even 1 chunk of garaunteed loss is still 5 seconds for chunksMissing
+            - If 1 chunk is to be lost, it doesn't matter how many more get lost
+        - Therefore there should be a system where we garauntee that even if chunksClose, we can still send that buffer
+    - SOLUTION 1:
+        - Minimize the underlying webrtc-rs buffer size as much as possible WITHOUT performance impacts
+        - Use a pool managed buffer system that only removes chunks after underlying DC buffer 
+        - is known to have flushed all those chunks PLUS a little extra to account for possible lost
+        - chunks during transit (close message arrives before chunks? either way it can happen)
+        - SUBPROBLEM 1:
+            - Since the underlying buffer and managed buffer won't be in sync, possible to send duplicate
+            - We have to trust that the small DC buffer size won't cause too much performance impacts
+            - SOLVED (sortof)
+        - SUBPROBLEM 2:
+            - How do we cap the sending of chunks (from sendFile)
+            - IN THEORY:
+                - We should assume that if one DC's buffer is full, then we shouldn't
+                - send to the other DC's anyways, because since we are sending the same chunks,
+                - the buffer fill rate will be relatively the same, the only difference is if
+                - we were also sending someone else's chunks (SUBPROBLEM 3)
+            - We acutally want poolManaged buffer to be a decent size so there aren't too many channelComm
+            - Although tests show webrtc-rs is fine until 512kb, I suspect lower performing devices
+            - will suffer from the extra channel calls (for onLowBufferThreshold), therefore
+            - size will probably have to be minimum 16mb (so managed buffer will have to be MIN 16mb, total 32mb)
+            - Min 16MB because onmessage will still come regardless (not much we can do, we need a buffer)
+                - BUT the buffer should only go to pool managed NOT the underlying DC
+                - Underlying DC should only go to 16MB (which is current browser implementation)
+            - AT MINIMUM for 4 DC to be filled, it would take 4 * 16 mb
+                - 4 because chunks sholdn't send to neighbouring nodes
+                - Although one DC can take this all, the point is the limit shouldn't be below that
+                - Or else we definitely have 1 DC that's not filled (pigeonhole principle :D)
+                - This should be the equivalent of our lowBufferThreshold for pool managed buffer
+            - 4 * 16MB is lowBufferThreshold
+            - Max bufferThreshold should be at least double for default?
+        - SUBPROBLEM 3:
+            - The reason why multiple file sending doesn't work well is becuase
+            - IF the sender also is transmitting someone else's chunks, then it will
+            - never get an opportunity to send since buffer is always full
+            - This should be a data hogging problem (untested)
+                - I argue that this is a feature :D (allows one file to be completed before other)
+        - SUBPROBLEM 4:
+            - Unavoidable but worth mentioning, EVEN with SUBPROBLEM 2 being "solved", the node that
+            - leaves, will LOSE ITS OWN BUFFER, so the 5 seconds getting chunksMissing will happen regardless
+            - So maybe the solution has to do with the whole mechanism in general? For now, NO SOLUTION
+        - SUBPROBLEM 5:
+            - Should SUBPROBLEM 3 of resending buffer even be implemented? This would just increase congestion
+            - There must be a buffer size limit within user control (with ABSOLUTE MIN BUFFER SIZE of 4 * 16)
+                - TODO THIS IS BAD IDEA
+                - Becuase just general overflow will silently drop and that's not good
+            - Maybe it should ONLY resend if buffer size isn't at the limit
+                - Should send pending queue first, then if buffer is still not full then send inflight queue
+                - ALL UP UNTIL BUFFFER IS AT LIMIT IN WHICH it should silently discard?
+            - On the other hand, maybe chunksMissing should let nodes add promisedChunks to reduce congestion
+                - And add a toggle to get from source
+            - SO queston is what to do when buffer goes above limit
+                - Well first we need to discard it somehow
+                - But what strategies can help us reduce the impact?
+                    - Send a request on behalf? NO
+                    - Ok so the node requesting will know that the node disconnected
+                        - If it also knows it is in path, it should just send a chunksMissing right away
+                        - It only has to approximate if it might've had its chunks, in fact you don't even need to check in theory
+                        - This implementation will help with the disconnected node's buffer missing and 
+                        - generally the overlfow of buffer in nodes in between, because it will most likely
+                        - overflow when node disconnected
+            - SUBSOLUTION 1:
+                - Yes there should be a buffer size limit, but only for OWN file chunk sends
+                - There should be a seperate data channel specifically for non chunk messages
+                    - In which case you can update proto to have 2 types of PoolMessagePackage
+                - Block the main/one chunks send channel and SCTP will notify of peer of rwnd
+                    - Which will eventually go right back to the actual sender
+                - Since we can block main chunks, we can and SHOULD prioritize the buffered chunks first
+                    - i.e the replacement node will be first send the buffered chunks including inflight chunks
+                    - NOTE: data_channel.buffered_amount() ALSO accounts for inflight
+                - The idea is that we really want to minimize the amount of lost chunks 
+                    - While controlling the whole flow using built in congestion control with SCTP
+        TODO:
+            - Keep current browser implementation except implement remove only after sent strategy
+                - using change in data_channel.buffered_amount()
+            - And set lowBufferThreshold to 256 or 512kb
+            - The max_buffer_size for each data channel should be 16MB
+            - The max_message_buffer_size is 64 MB minimum (pool managed)
+            - The buffer size can be controlled with BLOCKING of chunks send channel
+            - Create 2 data channels, one for general messages, one for chunks
+            - chunksMissing should have a toggle for whether to allowed promisedChunks or not
+                - Configurable, after 3 CONSECUTIVE chunksMissing of the SAME ranges
+                    - i.e the range of [a, b] was present all 3 times
+                    - Doesn't matter, it is configurable BUT need to consider network congestion
+                    - We don't want to default chunksMissing from source too quickly
+                    - But also if there's network congestion already, an extra 15 seconds won't hurt
+                - The toggle is mainly for future implementations of checksums
+            - REMEMBER TO SEPERATELY IMPLEMENT THESE DATA STRUCTURES (like webrtc-rs)
+
+- Rethink buffer... again
+    - The blocking goes all the way back to the sender
+    - But question is should it?, or is silent discarding an ok thing
+
+- also just note if node_connection exists, you should add to POSITION buffer, no need to check for connecting
+    - Even if it's closing, it should still defintely be added to buffer
+
+- big problem is chunksMissing will fire on the "path" that doesn't have the blocking issues
+    - which is still fine due to how filerequest works
+    - BUT not fine because you're wasting bandwith and blocking
+    - Note you are still losing chunksMissing anyways...
+    - But instead, chunksMissing should be smart
+        - Have a chunks tolerance (i.e consecutive chunks missing to immediately send again)
+        - If we are missing a FULL cacheChunk, we should just send
+            - But fileRequest doesn't deal with chunksMissing if not finished sending...
+            - OH should send if (1mb should be replaced with smaller value like 512kb) (no stay 1 mb)
+                - If sent and GOTTEN a greater chunk,
+                - and there are still at least 1mb sequential chunk missing BELOW the current send chunk number
+                    - i.e range of [0, 100], current send chunk number is 50
+                    - Only add chunksMissing from below 50 (and also no chunk ranges with 50)
+                    - this might result in duplicate, but it won't be that much
+                    - for promisedChunks, node will have to keep track of their largest cacheNumber and apply same rules
+
+- Oh buffer doens't even work if not ordered...
+    - Instead we make the internal buffer max 1mb
+    - And keep an external buffer (of max global size) that will be the one which
+    - is transferred to the next conn if this one closes
+    - On every lowBufferThreshold dequeue 1mb from external_buffer, then send the next 1mb (but don't dequeue)
+        - and every lowBufferThreshold should notifiy handle_chunks to recheck total_buffer_amount after deqeue
+    - In this case, we are still 
+    - If sending and buffer is 0, then add and send at same time, else just add at end of queue
+
+- Another idea, what if we just didn't manage an external buffer queue
+    - NOPE, don't even think about it, we run into the same problems, but just worse
+
+- Discarding is fine, since it is still in file cache,
+- But blocking just decreases throughput and blocks perfectly good data channels
+- Problem with discarding is what if you discard too quickly, i guess chunksMissing will handle that, better than blocking
+
+- Discard chunks IF at limit and datachannel EXISTS but is not open (don't interfere with nod_id == "" and no node_connection found)
+    - Track average of how many ms it takes to send 1mb
+    - And discard at that exact rate (using sleep in sendDataChannel, for every 1mb discarded)
+    - This is the compromise between increasing overall throughput of whole pool
+    - AND not wasting bandwith on chunksMissing requests
+        - i.e even though it is cached in file, that's extra i/o and bandwith we can save by rate limiting
+    - Also a node disconnect won't "effectively" change the equillibrium throughput of the pool
+
+- Should be something like 16 MB total buffer (performance test with different values)
+    - 8 MB deqeue (i.e size of internal buffer)
+    - can increase lowBufferThreshold to 1 MB
+    - 8 MB for the pending queue (i.e chunks not sent yet)
+    - IDEA: Need a DEQEUE and PENDING QUEUE amount to add up to 16mb PER data channel
+    - NOTE: For the sender, this would be a lot (which doesn't matter),
+    - but for usual nodes, they would only be sending to 1 or 2 DC, so 32MB potential lost
+    - Calculate throughput per MB (based on dequed actual length)
+    - Actually problem, filling the buffer will have to be at the same rate of sending
+        - If queue are equal (8mb and 8mb), then you basically don't have a buffer
+        - I don't even think that's the problem
+        - The thing is the handle_chunks should have a buffer of its OWN
+        - Or else when buffer is available (and worst case the rate we receive is slower than we send),
+            - then the buffer is working at a negative rate (i.e the buffer will not be useful at all)
+        - We need to garauntee that rate of filling the buffer exceeds the rate of sending, and block if we need to
+        - ALTHOUGH IN GENERAL, the buffer won't do too much (except help with dealing with slower nodes)
+            - Mainly for when a node DOES in fact fail, we need to make sure our receiving end
+            - has a garaunteed faster rate than what we send
+            - Right now, if we just block, we are not making use of the blocking time to actually receive the next messages
+            - AGAIN BLOCKING ISN'T ONLY FOR NODE DISCONNECTS, it's for overlfow in internal buffers
+    - TLDR:
+        - The idea of 8mb and 8mb is fine, but during the blocking time, we need to gather
+        - readily available
+
+- ALTERNATE strategy (NO WORK)
+    - Instead of external buffer, use bounded channel buffer of 64mb (or whatever)
+    - Keep data channel buffers at 1mb (which we will lose if they close)
+    - In this case, handle_chunk blocks on an approx of 1MB * 6 data channels (MAX 6mb lost, better than potential 64mb)
+    - Doesn't work because issue of what to do with chunks if node is connecting is still the same
+
+
+- ALTERNATE STRATEGY (require no additional locks)
+    - Have a buffer on handle_chunks channel
+    - DC internal buffer is how much we instantly lose + the leaked discarded amount right after
+        - Best to keep DC internal buffer as small as possible (min 1mb)
+        - There is a way to ...
+
+- EVEN BETTER (CURRENT) STRATEGY (no handle_chunks channel)
+    - Have data channel directly call handle_chunk (the function not the channel)
+    - Keep max buffer for each DC (16 MB)
+        - We will lose all this 
+            - If throughput is less than 16MB/s (assuming connection takes around 1 second),
+                - 64MB/s for 0.250 second 
+            - then you will be having diminishing returns (i.e purposefully losing buffer you had)
+            - Also assuming you block for that 16MB before trickling discards
+                - Or until connection is open
+                    In which case if you had diminishing returns from losing internal buffer
+                    you will tehcnically increase throughput since you wouldn't have to send a part of that buffer (originally)
+        - You can also implement another MUTEXED buffer queue and manage that
+            - Doesn't seem to be worth it
+            - Also you wouldn't tehcnically be losing 16MB, you would be trickling discard anyways
+    - Track min_time_to_send_per_mb
+    - DC buffer strategy
+        - If OPEN:
+            - BLOCK until lowBufferThreshold = 16MB - 1MB (experiment with value)
+        - IF CONNECTING:
+            - Have an initial buffer queue that has a FILL_RATE_TIMEOUT = Min(Max(1 millisecond, min_time_to_send_per_mb, 1 second) (equivalent to 1 MB/s minimum)
+                - Every buffer_queue_len_before_adding % 1_MB_OF_CHUNKS == 0 will block for FILL_RATE_TIMEOUT (This includes len 0)
+                    - Or else add to queue without blocking
+                - Assuming min_time_to_send_per_mb is also above 1ms (equivalent to 1GB/s)
+                - Have a mutex dedicated to this initial buffer queue
+                - on_open flush all of it
+                - RATIONALE:
+                    - For low throughput pools, 1MB/s will need 16 seconds to fill buffer before discarding, while not damaging performance
+                    - For high throughput pools, we don't want to block the 1GB/s max
+                        - chunksMissing won't be a huge penalty given the huge throughput anyways
+                    - For medium throughput pools, it will be the balance between performance and saving bandwith 
+            - If full, trickle discard (with same rate and at 1MB at a time)
+                - Remember to REMOVE before adding (to not exceed internal capacity)
+
+- NOTE node connection has to stay a hashmap due to promotional aspects and just how the design is right now
+
+- Chunks missing solution (CURRENT)
+    - DO NOT keep track of sent chunks
+    - File Sender does not add on to extra chunks missing IF request already exists
+        - If no initial chunks_missing:
+            - Problem is it really doesn't make sense, not only do you not get the most updated
+            information on chunks missing. But due to start_chunk_number, unless the requester
+            suddenly got extra chunks from somewhere (without adding to promise), sender would
+            end up sending those chunks anyways
+            - So tecnically adding chunksMissing doesn't hurt as well but just adds a little time
+            complexity to file sender
+        - If initial chunks_missing:
+            - Well no way to add to it anyways
+        - COMPROMISE:
+            - Add the promised chunks from any incoming requests because
+              those chunks are promised anyways so it adding will prevent
+              file sender from sending duplicates
+    - Attatch promised chunks should promise chunks for chunksMissing
+        - If this file is new
+            - Then based on chunksMissing this node probably won't have many more chunks to promise
+        - If this node has more chunks than delivered
+            - Well great! It can fill the job as the file sender and since promised chunks are attatched,
+              based on how the COMPROMISE works explained earlier, file sender won't send these chunks
+    - What if chunks missing fires repeatedly while nodes are reconnecting:
+        - Since chunks missing is also sent via partner int path
+          it also will not reach any nodes prior to that repeatedly
+        - Now the nodes connected to the requester can still promise/send
+          which will just more easily satisfy the chunks missing request until either
+          the requester stops sending chunks missing since file download is complete,
+          or requester will just wait until the node connection is re-established
+    - chunksMissing should decide when or not to turn the get from origin flag on
+    - Instead of mapping promised_chunks everytime, reduce chunks_missing (assuming origin flag isn't on)
+    - chunksMissing should not be empty if want the whole file, should send whole chunk range of file
+        - Should still update promised_chunks so file sender (who will not add new chunksMissing if request exists)
+          can be notified during sending that those chunks are promised
+        - chunksMissing should be modified if adding promised chunks
+        - Do intersection of chunksMissing & avail_promised_chunks for promised chunks
+        - Do diff from chunksMissing & !avail_promised_chunks for new chunksMissing
+    - Many more optimization opportunities but this is a good baseline

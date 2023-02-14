@@ -1,0 +1,73 @@
+PROBLEM:
+    - SystemTime is required for EPOCH and system time can change based on user
+    - Even a few seconds drift will make the user experience insanely bad
+      since everything is sorted in terms of created, which again is a user defined time
+
+- Also note that sync server will distribute its own timestamp for adding nodes
+- Might need a new update latest system?
+    - Becuase we should add based on received BUT there should be time frames
+    - i.e we don't want to append old data (that's clearly old) to the front of
+      the messages
+- Needs to be some kind of threshold
+- A global dynamic seuqence number????
+
+Global Version Number: (would only synchornize a "section")
+  - On every update latest request, both nodes will send each other their version number
+    along with last message_id
+  - Would help calculate drift
+  - Update the version number that is highest (yours or the other ones)
+
+- Similar to cleaned missed messages, there should be one for the neighbouring nodes
+  to send to that particular node
+
+- Or why not just send the last 50 all the time?
+  - I guess?
+
+- Should still be a created timestamp SO we can completely weed out
+  old messages (that might not be in received queue)
+
+- DO NOT ORDER BY CREATED
+
+- Current missed_messages / messages system is REALLY badly designed
+  - missed_messages are sent by the other node anyways, why not just send
+    - Also missed_messages affect all the surrounding nodes anyways
+  - If missed_messages follows the assumption that in an otherwise connected
+    system, you don't need to recover these missed_messages. Then why is getting
+    latest getting based on last_message_id? Especially since ordering by created
+    is an extremely bad idea.
+  - (DONE) No get latest if not new, instead send missed_messages directly
+    - missed_messages are implemented for all nodes not just promoting ones
+    - For new, use regular get latest (without missed_messages)
+    - There still needs to be a filter for init_messages
+      - But no need to manually add file/offers, just add message
+      - Becuase all the other info is delivered by file_seeders
+    - Though make sure it doesn't go to handle message, and goes straight
+      to distribute message (due to received queue)
+    - init data (file_seeders and display_name) needs its own message
+
+- (DONE) NODE_STATE should not exist
+  - Should only be a U.I thing
+  - Remove from pool.v1.proto
+  - It actually doens't make any sense
+
+- Getting older messages (pagination):
+  - TODO
+  - One thing to note is you can have a certain time drift threshold
+    that is static and agreed upon. Therefore when getting messages,
+    would also know exactly what the maximum drift is
+    - So instead of finding messages generally by messageID, we can narrow
+      search to time, and then find messageID
+    - Also nodes violating the time drift should be reported?
+    - Should all messages be attatched with a timestamp to be evaluated/judged by other nodes
+
+- Small note, all received messages (even from pagination requests) should be cleaned off dups
+  - ReceivedMessages considered ALL messages, not just stored messages
+    - Also cannot filter through pagination, only recent
+
+- ONCE JOIN POOL, every node should resolve their inconsistent histories
+  - If joining node has extra history, then send out
+  - If joining node has less history, the ask neighbouring/connected nodes
+  - Since every node should be up to date, then this should make every node
+    in the pool have consistent histories
+  - Efficient way to footprint this history? Or ask until a specific time threshold?
+    - And if user scrolls past that time threshold, you can start manually asking?

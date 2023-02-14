@@ -1,0 +1,70 @@
+- Instead of putting media in cache like browser, we instead immediately "cache"
+  the media into the cache directory as a FILE (also means it doens't go in main cache)
+- With this, write only happens once (chunk by chunk) so after write, you just need
+  to add to the acquired chunks and then make available as cache
+- And then once complete, make available via events
+- Keep media cache queue (based on max queue length with media being max 25mb)
+- Instead, webview will use convertFileSrc using path to render the images
+    - Since our messages view automatically lazy loads, the in memory images
+      will automatically do so as well while still having these images in
+      cache directory
+    - ALSO NOTE, becuase it is loaded into memory, it's perfectly safe to 
+      delete the actual media file in cache directory.
+        - Once webview releases media from memory, you will not be able to convertFileSrc again
+    
+- Design problem:
+    - Media caching requires both the functionality of file download and cache_manager
+    - You can also apply the same concept to actual file downloads, but this information
+      needs to be available to caceh manager when adding promised chunks
+    - cacheManager can always check FileDownloadManager...
+  
+- File Download Manager:
+  - It probably should be aggregated in pool_net
+  - There is zero reason for it to be a global manager
+  - This way, chunksMissing can be easily implemented as well
+  - Should also handle media download
+  - Question is should cache go to BOTH file download + cache, or just file download
+    - If just file download, then promised chunks (which will have an function in pool_net)
+      will have to search from file download to send the promised chunks
+    - i.e file download will have its own write/reader loop just like cache chunks
+      - The implementation is different though
+      - Do the logic like sendFile
+
+- Where does sendFile logic / sendMedia go?
+  - If doing the caching strategy above, then there is overlap in
+    both caching and sending of both file/Media
+    - In this case, Media is just a file where the location isn't user specified
+    - Also meaning isMedia flag isn't needed technically, we just default as cache 
+  - straight up file manager instead of file download manager
+    - Would control file downloads, media files, and sendFile
+    - Have a sendChunk channel?
+
+- Own file offer shouldn't cache
+
+- User deleting files implemntation problem
+  - File handle won't be able to detect delete, it will just read 0
+  - If that's the case, we don't want to keep advertising that we can provide chunks
+  - How do we know if file doens't exist?
+    - A non robust way is to check that the path still exists
+    - Any renames, or anything of that sort will mess it up
+    - Which i guess is fine?
+      - It provides an unecessary restriction but
+    - NO NOT FINE, it is not cheap (no way you are calling this every chunk) 
+    - BUT we don't have to check on each file chunk
+      - INSTEAD, check on every "request" type action. i.e
+        - add file download
+        - send file request (check that our file download is still valid before sending req)
+        - complete file request
+        - attatch promised chunks
+        - every send file request
+      - Equivalent to validateFileOffer (should be in pool_net)
+        - This is fine since pool_net is just the interface to file_manager
+    - If they delete cache file then we just ignore because that
+      follows the same logic as just not promising chunks (intentionally)
+      shouldn't happen under normal circumstance. Also recoverable.
+- !!!!!! ALL OF THE ABOVE IS SORT OF WRONG !!!!!!!!!!!
+- DELETE FILE DOESN'T ACTUALLY MEAN THE FILE CANNOT BE READ 
+    - On windows, an open file will NOT actually delete
+    - On unix/linux, it is pending deleted 
+    - Remove path exists (for the unecessary checks)
+    - read exact will fail if anything else happens so NO worries

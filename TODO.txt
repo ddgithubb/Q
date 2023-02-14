@@ -1,8 +1,69 @@
-
-- Performance test rust libraries
-    - webrtc-rs
-    - go pion
-- TAURI confirmed for now
+- Implement distribute message (DONE)
+    - Implement dest visited (DONE)
+    - Implement chunks functions (DONE)
+- Implement cache_manager (DONE)
+    - Make sure cache file name includes timestamp (DONE)
+- Implement file_manager 
+    - Implement file download (both file and media/no path files) (DONE)
+    - Implement caching behaviour (DONE)
+    - Implement send file/media (DONE)
+- Implement promised_chunks (DONE)
+    - Implement handle_chunk (DONE)
+    - Implement send_chunk (DONE)
+- Implement chunks_missing (DONE)
+- Implement file_request (DONE)
+    - Implement if already have media/temp_file, copy (don't go through sendFile) (DONE)
+- Implement store manager (DONE)
+    - Enable fs https://tauri.app/v1/api/js/fs/
+    - Store manager seperate from events maybe
+    - File offers should be stored in store
+    - Store should be stored in JSON format
+    - Keep different json files to avoid rewriting a bunch
+        - i.e user info / config content / file offers / etc.
+    - Periodic state event updates (mainly for file download)
+    - SINCE temp files are also file offers, store as well
+    - Store manager should have a function to create a cached version
+        - And use this cache to be stored in pool_state
+        - This way we don't have to go throuhg arcswap for user_id / device_id
+- Implement rest of sync server commands (DONE)
+- Implement all core functions / add template
+- ALL CLEAN FUNCTIONS / todo!()
+    - Make sure to check browser implementation for extra steps
+- Implement rest of pool_client
+    - Implement UI bindings / Message bindings
+    - Implement Events (including event updates i.e for file download)
+    - Implement complete download U.I + Event
+        - When download completes, user will see on the bar that downloads
+          have completed. When they click, it opens file dialog to that path
+    - https://tauri.app/v1/guides/features/command#async-commands
+        - Nvm, it is not executed on main thread, so no worries
+- TEST
+- Implement message saving
+    - Implement load init messages to received_queue
+- Implement authentication system
+    - Only one user should be active per device
+    - Could change in future?
+    - PASSKEYS
+        - Except maybe custom authenticator?
+        - No need to install an extra app
+- Implement sync_server saving data using db engine
+    - https://github.com/akrylysov/pogreb (KV fast reads) (CURRENT CHOICE)
+    - https://git.mills.io/prologic/bitcask-bench (for other choices)
+    - NOTE:
+        - Should not store any configuration
+        - Should ONLY store devices and id's which is attathched to the user identity
+        - So in theory, ONLY the authentication system stores anything
+        - Configurations will be synced through their devices
+        - BUT actual pools need to be stored/the users in them
+            - But this should be lightweight and things like display name
+              should be managed IN the pool
+            - That being said there should be a good indicator on identification
+                - show ID on hover
+                - profile pictures
+                - etc.
+            - BUT user data such as "what pools i'm subscribed to" should be within device
+- Implement a device to device pool / sync data
+    - This interface/pool will be dedicated to device data syncing
 
 - Desktop app and mobile app (IMPORTANT!)
     - Try to have some documentation for the more difficult to understand parts!
@@ -37,9 +98,8 @@
     - DOWNLOAD HISTORY
     - Store fileOffers / filePath
     - Add folder support
-    - Allow copy image / drag and drop    
-    - Benchmark seek write seek write seek write vs append only
-    - Benchmark read/write buffer sizes
+    - Allow copy image / drag and drop
+    - Automatic connection between devices on home screen (defaul pool)
     - Report nodes system
         - Verify identity of message (relative to src node using public private keys)
             - This is why chunksMissing shouldn't have promisedChunks
@@ -100,16 +160,8 @@
         - Running your own notification instance, so sync-servers can connect to you
         - Push notifications
 
-- REWRITE WEBRTC/POOLCLIENT STUFF IN C++/RUST USING WASM/C++ addons nodejs
-    - https://github.com/bobbiec/react-wasm-demo
-    - https://github.com/murat-dogan/node-datachannel?ref=morioh.com&utm_source=morioh.com
-    - https://github.com/paullouisageneau/datachannel-wasm
-    - https://rustwasm.github.io/wasm-bindgen/examples/webrtc_datachannel.html
-    - https://tkat0.github.io/posts/how-to-create-a-react-app-with-rust-and-wasm
-        - Using above 2 links, you can rewrite all of poolclient (supports websockets)
-        - Need to figure out performance implications from passing data between
-
-
+- PROXIMITY CHAT IRL:
+    - AirDrop
 
 BRAINSTORM NOTES:
 

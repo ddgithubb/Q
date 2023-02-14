@@ -2,29 +2,31 @@ syntax = "proto3";
 
 package sync_server.v1;
 
-option go_package = "/sstypes";
+option go_package = "/sspb";
 
 enum DeviceType {
-    BROWSER = 0;
-    DESKTOP = 1;
-    MOBILE = 2;
+    DESKTOP = 0;
+    MOBILE = 1;
 }
 
 message PoolBasicNode {
     string node_id = 1;
-    repeated int32 path = 2; 
+    repeated uint32 path = 2; 
 }
 
 message PoolUserInfo {
     string user_id = 1;
-    string display_name = 2;
-    repeated PoolDeviceInfo devices = 3;
+    repeated PoolDeviceInfo devices = 2;
 }
 
 message PoolDeviceInfo {
     string device_id = 1;
     DeviceType device_type = 2;
     string device_name = 3;
+}
+
+message PoolInfo {
+    repeated PoolUserInfo users = 1;
 }
 
 message SSMessage { // Sync Server Message
@@ -73,8 +75,8 @@ message SSMessage { // Sync Server Message
     }
 
     message UpdateNodePositionData {
-        repeated int32 path = 1;
-        int32 partner_int = 2;
+        repeated uint32 path = 1;
+        uint32 partner_int = 2;
         bool center_cluster = 3;
         repeated string parent_cluster_node_ids = 4;
         repeated string child_cluster_node_ids = 5;
@@ -108,27 +110,25 @@ message SSMessage { // Sync Server Message
     }
 
     message InitPoolData {
-        AddNodeData my_node = 1;
-        repeated AddNodeData init_nodes = 2;
-        repeated UpdateUserData update_users = 3;
+        repeated AddNodeData init_nodes = 1;
+        PoolInfo pool_info = 2;
     }
 
     message AddNodeData {
         string node_id = 1;
         string user_id = 2;
-        string device_id = 3;
-        repeated int32 path = 4;
-        int64 timestamp = 5;
+        repeated uint32 path = 3;
+        uint64 timestamp = 4;
     }
 
     message RemoveNodeData {
         string node_id = 1;
-        int64 timestamp = 2;
+        uint64 timestamp = 2;
         repeated PoolBasicNode promoted_nodes = 3;
     }
 
     message UpdateUserData {
-        PoolUserInfo userInfo = 1;
+        PoolUserInfo user_info = 1;
     }
 
     message RemoveUserData {

@@ -1,0 +1,237 @@
+- One file for each pool (not like it matters)
+- Deletions would be easier
+- Reading would be easier
+- Multithreaded
+- Overall makes sense
+- It is actually safe to write and read concurrently,
+- Problem is deletion. Deletion requires lock / semaphore
+- Just need a lock for the hashmap
+- But there are no concurrent read/write
+- One concurrent read and write at any given time
+- Just need a semaphore for read and deletes
+    - If is deleting, don't add to cache chunk queue
+    - If is reading, try delete next in queue
+        - READING should be set on add to cache chunk queue
+        - If there are none available, mark delete and wait
+            - Polling is fine, because you are going to have to delete
+            - next cache chunks anyways, in which case you might not have to poll
+            - Poll 50ms/100ms
+            - In this case, an unbounded cache file chunk doesn't work
+                - Because you can easily overflow it if you poll
+                - Also this is basically just an entire file lock
+            - Actually the problem stems from adding a semaphore to reads
+                - Becuase you have no option but to wait for the reads to be done right?    
+        - ANOTHER PROBLEM: We don't want all nodes to have the same cache file
+            - How to distribute evenly?
+            - Deletes would have to be "random" or optimized
+                - Idea: The more further away from src, the more recent data it should have
+                - Shouldn't be exactly random... unless it should be?
+                    - Can use the path as a seed assuming seed will have the same RNG type results
+                    - Becuase if so, then the whole panel will be on roughly the same strategy which is great
+            - PUT ON HOLD, becuase the point of cache is to have most recent
+                - It provides no benefit to holding more non-recent data
+- Cache chunks should be smaller?
+    - 16MB
+        - Pros:
+            - Better seq read and write performance
+        - Cons:
+            - 1GB file can only fit 64 cache chunks
+            - If there is like 1 chunk, then it will still take 16MB
+            - This is due the "lockless" caching system works
+                - We seperate the semaphores to cacheChunks, not individual chunks
+            - This is also due to cache chunk allocation works
+                - If done chunk by chunk, eveyr chunk would have an offset key
+    - Chunk by chunk
+        - Pros:
+            - No space lost, 1GB of chunks is 1GB of chunks
+        - Cons:
+            - 32,768 chunks per 1GB file
+                - Not really a memory problem, just a problem
+                - Every chunk will require it's individual operations
+                - chunksMissing wouldn't have any ranges (which will be very long)
+                - If all the chunks are included, it will be 32kb message (BAD VERY BAD)
+            - Random reads would a lot
+    - 1MB:
+        - Pros:
+            - A good range of 1024 cache chunks per GB file
+                - Cache file limit should be 1GB max for now
+                - We don't want promised cacheChunks to be ridiculously long
+- One set of cache reader/writer PER pool
+    - We don't want the timers between 2 pool being mixed up
+    - Each max file cache size
+- REQUESTING CACHE HINT?
+    - Variation of chunksMissing
+    - Does chunksMissing always need to have a dest? (currently it does)
+
+- Better solution to read and writes/deletes
+    - Writes will be sequential / sequentially circular
+    - There is a head which indicates longest cache chunk
+    - Requires an "active_lock" mutex for each chunk
+        - Only activated when physically reading/deleting/writing
+    - When reading, if promised chunks requires ALL the read chunks
+        - Put a read semaphore to all the cache chunks (unless indcated deleting)
+        - But send starting from where current head is
+        - Acquire lock (the only wait will be from chunk_writes which won't be long)
+    - When deleting, always delete starting from head (oldest cache chunk)
+        - Add sempahore flag for deletion
+        - Wait for lock, until deleting
+    - For writing to cache, there is a bounded channel,
+        - bounded_channel is full, drop (try_send)
+        - The problem is draining on the other end is that
+        - You would have to try acquiring the mutex all the time
+        - Seperate "write_cursor" for write, only delete when cursor returns to head
+            - Seperate from updating cacheChunk, this is only creating new ones
+            - i.e tail cursor, the cursor where to write new data
+        - and no existing cache chunk, again wait for lock if reading
+        - Min 16 MB buffer
+
+- PROBLEM: The promised_semaphore is problematic
+    - Let's say there is no write buffer,
+    - We'll say send promised chunks is halfway through
+    - If there is another request that calls for chunks in the FIRST half of cacheChunksQueue,
+    - then it wouldn't make sense to use promised_semaphore because what if the writer suddenly
+    - starts writing, it would have to wait for the reader to read ALL of the last half before
+    - getting to the writer
+    - Is that OK? Beucase writer will just drop new cache chunks, which is not end of the world
+    - But promised chunks should still go in one direction, that way you reduce the chances of
+    - the writer waiting unecessarily for promised_semaphore to open up
+        - PROBLEM 2:
+            - Actually none of this works, writer will still have to poll beacuse if
+            - it sees promised_semaphore, it might not be active_locked
+    - So...
+
+- IMPROVED VERSION:
+    - Promised cache chunks is ORDERED relative to cache chunk queue order
+        - i.e if there is a request that requires an older chunk, it will be sent first
+        - Even if the "cursor" for promised cache chunks is further on
+            - SUPROBLEM: This could cause chunksMissing?
+            - SUBSOLUTION:
+                - if writer encounters promised_semaphore:
+                    - if at HEAD of promised cache chunks
+                        - remove from queue/map
+                        - wait for sent_promised
+                        - delete
+                    - else sequentially go to HEAD
+                        - If a cache chunk is not promised_semaphore
+                            - remove from queue/map
+                            - delete
+                        - else sequentially increment
+                - else remove from queue/map, then delete
+            - Would require array implementation + cursor instead VecDeque
+        - TODO: How to implement
+            - Need to keep track of head
+            - Need a map of all the promised chunks requests
+                - Instead, use CacheChunks position_map
+            - For order, just use cache_chunks array along with head info
+                - Search for the next
+            - How to get cache_chunks:
+                - I think the cache chunk MAP might be necessary
+                    - To find promised_chunks
+            - Do we need a "read_loop" ?
+                - Yes
+                - One for cache_manager, one for pool_net
+                - pool_client adds to it
+                - cache_manager will have to bundle the message (it has requesting node info)
+                    - Actually no, pool_net loop goes strait to send_chunk
+                    - Implement send_chunk
+                    - Actually there should be send_chunk loop, with a channel
+                        - That way file_manager can also send_chunk
+                - Need to implement a "wake" function or just spawn new task for loop if not exist
+                    - Wake should be a channel, not restarting the task
+                    - Block on wake if gone through 
+                - Remember to turn off promised_semaphore
+                - Either use active_lock, or 2 semaphores, one for promised, one for deleting
+                    - The deleting is just for read_loop to determine whether or not to send channel
+
+
+- LRU cache? No that doens't make sense, because the whole point is more for chunksMissing while sending
+
+- ONE CACHE MANAGER PER POOL
+    - The decision comes down to whether or not pool should delete cache chunks after
+    - Or to have a single 1gb cache file
+    - Also consider what would hapeen with reconnects
+        - It's ok, we can just leave cache file
+        - Delete on exit of application/start of application
+    - OK one cache manager per pool
+- https://docs.rs/tauri/1.0.0-rc.0/tauri/api/path/index.html
+
+
+- Cache writer
+    - Requires queue
+    - Requires promised_semaphore
+    - Requires chunk_ranges
+        - chunk_ranges max size is 32 / 2 = 16
+- Promised chunks reader
+    - Requires queue
+    - Requires promised_semaphore
+    - Requires promised_requests (chunk_ranges will be garaunteed in range)
+- Handle Message add promised chunks
+    - Requires promised_semaphore
+    - Requires promised_requests
+    - Requires chunk_ranges
+    - Requires all cache chunks + chunk ranges of file_id
+
+promised_semaphore needs to be synced with promised_requests
+
+- IT IS OK to lose a cachechunk during the promised_requests lock
+
+- Promised_requests doesn't have its own map and queue:
+    - PROS:
+        - If you have a whole queue of promised_chunks, writer will be able
+          to eventually catch up with reader, or at least have a better chance
+          of doing so (relative to client adding promised chunks) meaning it will
+          be able to consistently write new data
+            - If we kept a seperate queue, the reads will be all over the place
+              meaning writer will have to by chance continuously loop until
+              it "captures" a head.
+        - Will prevent random reads "blocking" writes even if there are available writes after
+            - Becuase reads are sequential, you make sure that nothing after the read head
+              is available, as writer is always on reader's tail
+    - CONS:
+        - Requires a mutex for every single chunk
+        - Insert requires a read and write mutex...
+        - Do we even need a readwlock? especially with inserts being so frequent
+
+- Design with ONE mutex, promised_requests map and promised_requests queue (of chunk_pos) and read_head
+    - Promised_requests queue == max chunk amount, writer should wait for head
+        - Else loop to find a request without promised
+    - Adding promised_request cannot add from the chunk at the beginning of the queue (read_active)
+    - Reader will remove from queue + take promised_requests before reading
+        - Writer will just have to see len >= MAX_CACHE_CHUNKS_AMOUNT - 1
+    - Active lock still exists
+        - Since read can encounter writer, and writer and encounter reader
+    - Deletes updated before, insert updated after
+        - Still requires 2 mutex locks
+        - SOLUTION: Have a read_active + lock and write_active + lock
+            - read looks at write_active, if it is writing, acquire their lock (and update own active)
+            - write looks at read_active, if it is reading, acquire their lock (and update own active)
+            - else acquire own locks
+            - DOESN"T WORK, because if write acquire read lock, read can't read anymore
+            - Add promised chunks checks to not use insert_active or read_active chunks
+    - In addition, 1 mutex is not a bad thing:
+        - Writer requires a lock regardless
+        - Reader requires a lock regardless
+        - Add promised chunks doens't necessarily require lock, but because it requires read lock
+          it is essentially another lock
+        - It is either this or a mutex on every single chunk + atomics
+
+- Might not need write_active (need read_head though)
+    - Worst case scenario:
+        - Insert happens, promising chunks not already written
+        - Insert will acquire active lock of that chunk
+        - Promised chunks reads that there are promised chunks
+        - It immediately adds to queue, assuming that queue was first
+        - Read chunks reads queue, takes all the request info, then acquires active lock
+        - At this point, acquires active lock is garaunteed to be acquired after write
+        - Therefore satisfying promised chunks
+    - ONE PROBLEM:
+        - If insert fails, then you will lose that chunk
+        - So be it? Yeah because reads can fail as well,
+        - and we can't do anything about that
+        - Even if all writes start failing, it'll only be 1 chunk that it cannot promise
+          at a time. Adding an atomic is actually not that great because you negate
+          a whole cache chunk
+
+- ALSO don't think that cache send promised chunks designed can be changed into
+  how sendFile works. It doesn't work due to the constant deleting nature of cache
+  since the writer needs to check if that specific cache chunk is promised or not

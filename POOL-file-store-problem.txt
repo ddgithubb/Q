@@ -1,0 +1,52 @@
+// add to file offer
+// PROBLEM
+    // SHOULD TEMP FILES GO IN FILE OFFER
+    // Just becuase temp file exist DOES NOT atuomatically
+    // make it a file offer. User can retract if they want to
+    // But it sohuld go into file_paths? Well no, file paths is
+    // just an easier way for us to verify that it's a file offer.
+    // i.e a temp file can become a file offer again
+    // THEREFORE, temp files are seperate from file offers
+// Ok so now what do we do about file downloads of media
+    // First this conflict happens only after copy download
+    // Since it wouldn't be possible to go through download flow if this
+    // restriction already existed in the first place
+    // Note by this logic, you would never have to check through temp files
+    // when adding a file download (i.e all the temp files that are offered will be in file offers)
+    // Actual file should take priority, not temp.
+        // By priority, it means that it gets updated in file offers
+    // What happens during retraction:  
+        // A) Check temp files to see if there exists a file to cover
+        // B) Ignore
+        // Doing 'A' doesn't hurt, and would result in just a switch of chunk_sender
+            // i.e no need to actually retract 
+
+// 1. download file / file request
+    // Check existing: file_id
+    // If exist, copy, and fire complete event
+    // If exist and temp, copy, fire complete event
+        // Replace file offer/chunk sender after finished copying (DO NOT IMPLEMENT)
+        // "replace_file_offer" 
+        // Use different tokio thread (NOT NEEDED) but use async version
+    // If not, send file request and proceed as normal
+// 2. Add File Offer
+    // Check existing: path
+    // If exist, ignore
+    // If not, return as normal and add file offer/chunk sender
+// 3. Retract File Offer
+    // Check existing: file_id 
+    // If exist, retract
+        // Check existing: file_id for temp files
+        // If exist, do not send retract, change chunk sender (DO NOT IMPLEMENT)
+        // If not, send retract, proceed as normal
+    // If not, ignore (no file to retract and not present in file_offers)
+
+- !!! The idea of replacing file offers is a really bad idea !!!
+- Becuase if you are copying something, it shouldn't be on the user to have
+  to seed that file. I.E temp files should not have any prioritization and vice versa
+- BUT a mechanism that can be implemented is a kept list of all copies?
+    - This would only be for temp files right, because it's only so user experience is good
+    - i.e if image exists, it should be displayed in pool net
+        - This should only store 1 backup
+
+- TODO (come back to this idea after client has been implemented)
