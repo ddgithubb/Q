@@ -71,3 +71,7 @@ Global Version Number: (would only synchornize a "section")
     in the pool have consistent histories
   - Efficient way to footprint this history? Or ask until a specific time threshold?
     - And if user scrolls past that time threshold, you can start manually asking?
+
+  - NOTE: Should only resolve current history
+    - Anything before that could in theory be asked, but as of immediate downloads
+    - It should resolve that, and then display that history at start (with a jump recent button)
