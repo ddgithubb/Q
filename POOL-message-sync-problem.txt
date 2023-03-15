@@ -70,8 +70,262 @@ Global Version Number: (would only synchornize a "section")
   - Since every node should be up to date, then this should make every node
     in the pool have consistent histories
   - Efficient way to footprint this history? Or ask until a specific time threshold?
-    - And if user scrolls past that time threshold, you can start manually asking?
+    - And if user scrolls past that time threshold, you can start manually asking? (CURRENT)
 
   - NOTE: Should only resolve current history
     - Anything before that could in theory be asked, but as of immediate downloads
     - It should resolve that, and then display that history at start (with a jump recent button)
+
+- Session:
+  - Each group of synced messages should be in a session
+  - This would make more sense becuase it's the easiest way to
+    differentiate what nodes will request. Or else if we didn't,
+    then we would have to refer everything to message id starts
+    WHICH is bad becuase messageID starts aren't always accurate
+      - Using only messageID and time is possible, but would require
+        some diffing algorithm every time because time is involved
+  - First node is the one to start the session
+  - SessionID is generated and a session time is generated
+  - POSSIBLE that server generates these values?
+    - Because if server generatess these values, then time
+      drifts can be accounted for
+        - No that's a lie, maybe for the first few nodes but
+          the mechanism is useless for the most part
+    - There is no sync issue so it wouldn't really solve that
+  - Possible server keeps track of all sessions?
+    - Dumb, Really Dumb
+    - Add nodes/Remove nodes is a necessity while this is 
+      just state management metadata which should be handled
+      by users themselves.
+
+- How to store messages?
+  - Fixed or Dynamic sizing (based on session)
+    - Fixed:
+      - Hard to get start of session
+      - Deterministic file sizes and management
+    - Dynamic Sizing:
+      - Needs MAX bound
+        - Require pagination for max file sizes
+      - Only reading relevant data
+  - Both of the above is dumb
+    - Just don't load all the data in memory
+  - So traditional databases and whatsapp all put
+    all their data in one big file. For this application,
+    this wouldn't suffice as there would be constant history
+    resolving which would append data in the middle of this
+    big file, especially if added functionality for users
+    manually asking for old data.
+    - But do we really want a lot of session files?
+    - Compaction strategy?
+  - NOTE Order doesn't matter in storage
+
+- Message Store (CURRENT)
+  - Have a current session file and an archived file with immutable
+    sessions
+  - Append current session file to archived file when session is done
+  - Keep track of session id and offsets (ORDERED) in store file.
+    - Use binary format (add functionality to store)
+    - Everytime it updates, need to rewrite whole file
+    - Not ideal, but the data is small so no real impact
+  - Last/Current session will not have an offset YET
+  - Edge case:
+    - Sessions with zero messages SHOULD NOT be accounted for
+      in any form (basically a non existant session)
+  - Needs a session store for each pool
+
+- Requesting Latest Messages
+  - Send {active/last}_session_id and last_message_id
+  - Return:
+    - session_id
+    - latest_messages
+    - file_seeders
+  - If session_id is current, then send by last_message_id
+  - If session_id not current, then send all of session
+  - Problem is if session doesn't finish downloading, then you can't 
+    act as node to reply with latest data
+    - New boolean that determined whether updated_session (in pool_state)
+    - This way, we can tell requesting node whether we will start sending
+      (subsequently differentiating between just an empty session)
+  - Need a new downloading mechanism because file isn't fixed
+    - Need to send latest_messages first and then send sequentially from
+      start to end of session
+    - Requires logic to insert in active file
+    - MessageDB returns an iterator
+
+- Adding messages
+  - For adding to session that already exists (only occurs for active session)
+  - Possibly count average drift range + threshold and map all the msgID
+    from that range. And then iteratively add only if msgID not within that 
+    range
+    - Calculate drift range from request and the extra drift range from
+      the msgID created time?
+        - Not possible, but can estimate
+        - Better to just use threshold
+
+- Problem with sessions
+  - The idea is good, and definitely need to be used as it provides 
+    good synchronization
+  - Problem is how do we know the end of a session?
+    - Currently the strategy only works for syncing session data
+      from beginning to current time which in usual circumstance will
+      only lead 1 node with knowledge of the whole session
+    - By not knowing the end of a session, it can't be immutable
+      - i.e Sessions are only known immutable if session is not 
+        current session, and session is gotten from another node
+        who is that last 1 node of the session...
+  - But also asking for previous sessions is a little odd
+    - The best way is to send out a request to every node, and we
+      established that that isn't exactly great
+  - I think the idea of getting a whole session is very optimistic
+    in such an architecture. Probably a problem that we shouldn't tackle
+  - In that regard, maybe need to rethink the idea of a session
+    and what messages to really store...
+      - We could make it in such a way that single sessions represent
+        a "train of thought" or represent the same topic. Because
+        otherwise why bother sending latest messages
+      - Therefore sessions should exist (and should be downloaded from)
+      - In fact it should be downloaded from the beginning.
+      - Well let's think of the actual product feature here
+        - We aren't trying to solve the problem of synchornizing
+          all this text data together. This product is state based
+          not persistance based. i.e it's not like WhatsApp
+        - Therefore, session probably shouldn't even be downloaded
+          unless asked for (latest messages should be larger like 100)
+        - In this case, pagination doesn't even make sense
+          - Becuase the only garauntee is that every node in the
+            pool has history of the past latest_messages length
+        - But pagination should be important within a single session
+        - So maybe download the entire session?
+          - And treat any other previous session as immutable
+
+- Downloading Session Messages (1)
+  - Change of plans, do not download all
+  - Use pagination, but request pagination (which is a 2 call)
+  - Alright let's not worry about this for now. The problem can
+    be solved relatively easily in the sense that if disregarding
+    performance, UX, and even fluidity of the application, sending
+    these messages would be straight forward. But if we don't disregard
+    these design problems, then I think it might not be too worth it
+    to add this extra complexity (like broadcast file).
+
+- Downloading Session Messages (2)
+  - Download all in the session
+  - Open new direct data channel (to not block main)
+  - Pick 1 data channel (someone in parent cluster)
+    - In order to pick, you need to poll which nodes have session
+      or are currently getting session
+  - This is complicated as well
+  - Especially if you have long running session, every new node
+    will just end up downloading that session by default. So the
+    best idea is to do pagination. But we already established that
+    there isn't a great way to do that (again since you would have to
+    request to nodes who already have that pagination, which in the 
+    end of the day either puts pressure on those nodes, or you have
+    semi inaccurate messages).
+
+- Downloading Session Messages (3)
+  - TODO
+
+- Message store requires padding
+  - Unable to read backward, and since we are appending
+    we need padding to keep message chunks to be read one 
+    chunk at a time into memory. These chunks can be relatively
+    large up to 1 MB which isn't a lot. 
+
+- Basic Message Store:
+  - Everything is immutable, all messages are append only
+  - All messages go through received_queue (already does)
+    - PoolNet loads the offline messages to received_queue
+    - And append the resulting messages to messages db
+  - ONLY current session needs to be kept track:
+    - We don't want sender to send messages that are between
+      2 sessions, especially if current node already has messages
+      of that session
+    - Do this using latest_messages
+  - latest_messages should be in pool_net / pool_client
+  - The messages chunk should be in messages db (i.e the result of
+    getting a chunk from the db file)
+  - Message Logic:
+    - If is only node:
+      - Init latest_messages as empty
+    - If not:
+      - Init latest_messages with update_latest
+  - Make latest_messages 100 so that it can merged with receieved_queue
+    - NO becuase received_queue also contains other messages
+
+  - Pagination:
+    - Store should combine current feed with new history
+      for history by msg_id (make sure to cutoff half of it)
+    - Should return 2 chunks of messages
+        - Or keep track of 1 big chunk with offset
+        - But for messages_history_chunk_by_id should return 3
+          chunks just in case that the msg_id in question is last
+          of the chunk
+    - If last chunk, switch back to regular feed.
+        - Not possible, last feed is restricted to certain size
+        - Should merge with regular feed since regular feed has
+          all the information on node join and leave
+            - Can't directly merge as feed is constantly shifting
+    - Need to determine behaviour going out of regular feed and going
+      back to regular feed. This behaviour needs to complement each other
+        - Merging 1:
+            - Would only work if the shifted messages are added to history
+            - But history only works with history chunks so adding it
+              would give an ambiguous bound making it impossible to
+              request the next chunk
+            - So it would have to be history always containing that
+              next chunk, but merging the next chunk and use an
+              overlapping point to slice at the exact place
+            - Messages would detatch when there is no overlap
+                - But then how to know where user is in merge
+        - Merging 2: (CURRENT)
+            - Switch if overlap is majority of
+              the requested messages or overlap is just a threshold,
+              otherwise don't even merge, just display history
+            - Switch if go to latest
+            - Switching means using regular feed and deleting history
+            - If not switched, but is_latest/was_latest, then the
+              next request in asc direction is to the chunk AGAIN,
+              and then check overlap condition above, if not switched,
+              then re-set was_latest and proceed 
+            - Need to keep track of 2 chunks at all times 
+            - Create dedicated history interface 
+        - Latest would unconditionally get rid of history
+        - NOTE: Assuming latest feed has enough chunks to just
+          switch without side effects is not a good assumption.
+        - NOTE: is_latest history chunk DOESN"T MEAN it's going to
+          stay latest, so that information needs to be used immediately
+            - i.e if user stays on the history for long, the eventually
+              there will be more history chunks. So it will have to request
+              the same chunk again to get the full chunk
+        - Larger vertical screen, this just doesn't work
+            - Have offset array?
+            - Need to detect screen length
+                - https://docs.rs/tauri/latest/tauri/window/struct.Window.html#method.current_monitor
+            - Calc and Send max messages value to U.I
+            - Remove resize event function and replace calc
+              if needed
+        - If feed is full of non messages, then will have serious problem
+            - There is a possibility to just attatch feed and match
+              LAST message of the messageHistory result with the current
+              feed.
+                - Can also do this in asc
+            - Need to fix overlap
+                - If none are messages, then how to know that
+                  there is not more in that chunk?
+                - SOLUTION 1:
+                    - Put all consequtive users/node info in one
+                      "message" in an array and have its own max
+                      (large max), so that the next feedMessage is
+                      garaunteed to be an actual message
+                    - Do not need to delete, can have an overflow indicator
+                    - Maybe in future deal with this
+                - SOLUTION 2:
+                    - Always keep one message at top of the feed
+                    - If the SECOND message in the feed is not a msg, then
+                      delete that one. Therefore, the first one will ALWAYS 
+                      be the
+          - Sanitize html before send
+              - ACTUALLY, just disallow HTML. Send straight messages
+          - Limit size of messages (1000 characters)
+              - With 50 messages, it will be 50kb

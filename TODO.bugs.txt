@@ -2,3 +2,13 @@
     - https://www.frozenmountain.com/hs-fs/hubfs/4%20-%20blog%20images/Turn%20Stun%20chart.png?width=1118&name=Turn%20Stun%20chart.png
 
 - Possible alternative way rather than dests.visited? 
+
+- 32kb / 64kb isn't necessarily enough to send all latest data
+    - Since file_seeders is unbounded and latest_messages are technically
+      also unbounded, this could result in the latest just not sending
+    - Possible to unbound max_message_size in webrtc-rs
+    - This case, it's possible to just push a huge list of messages
+        - This would be good for "atomic" messages where it the 
+          only thing that matters is whether user gets this message
+    - Possibly change latestMessage to send 32kb (use encoded_len)
+        - Allows a larger size of characters

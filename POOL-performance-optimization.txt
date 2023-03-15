@@ -1,0 +1,7 @@
+- Tune variables
+- Maximize performance between multiple nodes
+- Problem is that if one DC is blocked, then it'll block whole operation
+    even if other DC's aren't filled
+    - Problem mainly comes from seeders nodes when distributing data
+    - Maybe this isn't such a bad idea. So multiple files can also be
+        distributed.

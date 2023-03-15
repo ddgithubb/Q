@@ -1,0 +1,27 @@
+- (DRAFT 1) Authentication:
+  - Logging in happens via REST API
+  - Logging in gives you a random cryptographically generated string
+      - This is stored in a TTL cache along with userID and deviceID
+  - During websocket, heartbeat will occasionally also send this 
+    string which replaces the TTL cache (every half time of expirey)
+  - During reconnect, use the string to "authenticate"
+  - If expired/invalid, must Login again
+
+- (DRAFT 2) (CURRENT) Authentication:
+  - Authentication hppens via REST API
+  - Gives you a token (UNIQUE to each server) with a relatively long timeout
+    - Make it 30 days for now to enhance user experience
+  - Every time you join pool, token is refreshed
+    - TOKEN SHOULD NOT BE REFRESHED DURING WS CONN
+    - Or else you can just infinitely stay connected and receive new tokens
+
+- (Draft 3) Authentication: 
+  - Ideally, you would authenticate each time you connected/reconnected
+  - The only way to do this well is if for every authentication, user
+    presence isn't needed
+  - This should be easily done with a FIDO2 compliant "device authenticator"
+    where the defualt authenticator would be a custom one built into the
+    application, this way we can bypass the security set by webview
+
+- The Android problem
+  - Need to find a hack to get webauthn client

@@ -1,0 +1,36 @@
+One to One (Dev):
+    - Around 4MiB/s (16 MB buffer, 1 MB refill)
+
+One to One (Release):
+    - Around 34MiB/s (16 MB buffer, 1 MB refill)
+
+Optmization strategies:
+    - Arc pool_net instead of Weak pool_net (NO IMPROVEMENT)
+    - Unbounded performance for chunk_handler (NO IMPROVEMENT)
+
+Problems:
+    - The chunk_sender NOR the chunk_handler is the problem
+    - If you completely remove both, it doesn't make a difference
+    - Performance hit comes from webrtc-rs
+        - Not nearly using as much CPU as raw test
+        - Possible bottleneck somewhere?
+        - Tokio shouldn't be the culprit
+        - NOT TAURI NOR WEBRTC_RS:
+            - Tested test_webrtc_rs on tauri. No performance drops
+            - It is purely application
+    - Possibly from the processing of packets WHILE webrtc is trying to send
+        - But doens't make sense, in the case where we didn't have a buffer limit
+          and immediately buffered all contents of file, it still didn't change
+        - NOPE, not the case. Tried test_webrtc_rs WHILE file download
+    - Possibly because it's between 2 programs?
+        - NOPE, modified test_webrtc_rs between 2 programs, same
+    - NOT distribute message
+    - NOT send data channel
+    - NOT encoding
+    - Only one left is send chunk handler?
+    - Need to find what makes it good peformance
+    - NO PROBLEMS!
+        - I misunderstood Mbps vs MiBps
+        - 34MiB/s corresponds to around 272 Mbps which was around what was tested
+        - Problem is from SCTP protocol
+            - Could create own protocol but would take a long time 

@@ -257,3 +257,21 @@ CURRENT IDEA:
         - Do intersection of chunksMissing & avail_promised_chunks for promised chunks
         - Do diff from chunksMissing & !avail_promised_chunks for new chunksMissing
     - Many more optimization opportunities but this is a good baseline
+
+- (PROBLEM) One data channel will block all other data channels
+    - Mainly a problem for chunk senders
+    - Also a problem in general
+    - The problem is how to control this without having an unlimited buffer
+        - Because the problem extends to if you have a DC with unlimited
+          bandwith, but one DC with a limited amount, then eventually you will
+          still run into this issue if you don't have an unlimited buffer as
+          the unlimited bandwith DC will always be able to accept data
+        - i.e it's an optimization problem
+    - For one, I think this just means you have to optimize chunk senders
+        - Chunk senders really control the download speed, it depends
+          how fast they can upload to all their required nodes
+    - (PROPOSED SOLUTION 1) Have a buffer for each partner int path
+        - Eventualy you'll still run into the same problem for that partner path
+        - But if you can come back to it (without putting in memory)
+            - This way you aren't letting any DC's idle
+    - TODO

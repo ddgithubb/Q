@@ -49,4 +49,18 @@
     - i.e if image exists, it should be displayed in pool net
         - This should only store 1 backup
 
-- TODO (come back to this idea after client has been implemented)
+- Keep temp file as backup (CURRENT)
+    - Downloading a temp file should replace file offer (not delete temp file)
+        - Download:
+            - If exists and path is temp, copy AND replace file offer
+            - If not, copy
+        - Fetching Media:
+            - Look at file_paths to get path
+            - If exist, check exist
+                - If exist, return file
+                - If not exist, retract file offer and go to next step
+            - If not, see if temp path exists
+                - If exists, return temp file
+                - If not, return error
+        - This also covers the sender's image problem!
+    - Use Customer URI protocol

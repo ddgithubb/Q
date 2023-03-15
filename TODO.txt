@@ -14,38 +14,63 @@
 - Implement file_request (DONE)
     - Implement if already have media/temp_file, copy (don't go through sendFile) (DONE)
 - Implement store manager (DONE)
-    - Enable fs https://tauri.app/v1/api/js/fs/
-    - Store manager seperate from events maybe
-    - File offers should be stored in store
-    - Store should be stored in JSON format
-    - Keep different json files to avoid rewriting a bunch
-        - i.e user info / config content / file offers / etc.
-    - Periodic state event updates (mainly for file download)
-    - SINCE temp files are also file offers, store as well
-    - Store manager should have a function to create a cached version
-        - And use this cache to be stored in pool_state
-        - This way we don't have to go throuhg arcswap for user_id / device_id
 - Implement rest of sync server commands (DONE)
-- Implement all core functions / add template
-- ALL CLEAN FUNCTIONS / todo!()
-    - Make sure to check browser implementation for extra steps
-- Implement rest of pool_client
-    - Implement UI bindings / Message bindings
-    - Implement Events (including event updates i.e for file download)
-    - Implement complete download U.I + Event
-        - When download completes, user will see on the bar that downloads
-          have completed. When they click, it opens file dialog to that path
-    - https://tauri.app/v1/guides/features/command#async-commands
-        - Nvm, it is not executed on main thread, so no worries
+- Implement all core functions / add template (DONE)
+- ALL CLEAN FUNCTIONS / todo!() (DONE)
+    - Make sure to check browser implementation for extra steps (DONE)
+- Implement rest of pool_client (DONE)
+    - Implement UI bindings / Message bindings (DONE)
+    - Implement Events (including event updates i.e for file download) (DONE)
+    - Implement complete download U.I + Event (DONE)
 - TEST
-- Implement message saving
-    - Implement load init messages to received_queue
-- Implement authentication system
-    - Only one user should be active per device
-    - Could change in future?
-    - PASSKEYS
-        - Except maybe custom authenticator?
-        - No need to install an extra app
+    - Test update latest (DONE)
+    - Test file offers between 2 nodes (DONE)
+    - Test caching (DONE)
+    - Test multiple dest send (DONE)
+    - Test chunks missing / chunks promised (DONE)
+    - Test caching while receiving (DONE)
+    - Test multiple nodes (DONE)
+    - Test multiple nodes with child nodes (DONE)
+    - Test multiple files at same time (DONE)
+    - Test removal nodes while sending (DONE)
+        - Without chunksMissing (DONE)
+        - With chunksMissing (DONE)
+    - Test image (DONE)
+        - Process image async (DONE)
+        - Deleted image render (DONE)
+    - Test temp files logic
+        - Implement Customer URI protocol (DONE)
+        - Test temp files overflow (DONE)
+    - Test max cache behaviour (DONE)
+        - Test without read (DONE)
+        - Test with read (THEORY TESTING)
+    - Test DC connecting leak system (DONE)
+- Implement message saving (DONE)
+    - Implement pagination (DONE)
+    - Implement go to latest (DONE)
+- Implement authentication system (DONE)
+    - Implement device link
+- Implement pool manager
+    - Implement pool manager logic
+        - PoolID are used (along with prefix like pool:{POOL_ID})
+        - Creating a new pool is unbounded for now
+        - Joining a pool requires poolID (use like >= 11 nanoIDLen)
+        - A request must be made
+            - The requester has a disabled/offline pool U.I view
+              to indicate requested pools
+            - Anyone in pool can accept request indicated in the
+              requests tab (make new tab)
+        - Cancel request can be made
+        - Leave pool
+    - Implement U.I
+        - One for all search bar
+            - Search bar configured to allow multiple types
+              of search
+                - e.g my pools/requested pools/actions like
+                  to request new pools/users (future)/ etc.
+    - Implement Request feed for each pool
+        - For pool for own devices, the request feed
+          would be to link new devices!
 - Implement sync_server saving data using db engine
     - https://github.com/akrylysov/pogreb (KV fast reads) (CURRENT CHOICE)
     - https://git.mills.io/prologic/bitcask-bench (for other choices)
@@ -64,6 +89,35 @@
             - BUT user data such as "what pools i'm subscribed to" should be within device
 - Implement a device to device pool / sync data
     - This interface/pool will be dedicated to device data syncing
+    - A sync folder 
+        - Can use on any pool. Offer a sync update?
+        - BAiscally like file offers but grouped update
+        - OR just a folder funcitonality that is checked every time
+          boot up and automatically sends the offer for new appearing files
+        - OR one just big shared sync folder
+            - All the diff happen on own node side 
+            - All files have attatched owners
+            - Only owner can remove their offer in big sync folder
+        - Maybe just implement that functionality to all folders?
+            - It should be a special tab though
+            - Folders can be on a sepearte tab and individual file should be
+              treated as individual file offers (i.e the file offers tab)
+        - Ok there should be no single SYNC feature 
+            - You already have tabs for every single available files
+            - Use that and provide features like "download all" or download missing
+            - Have indicator of which files you already have?
+            - Or even just do it for folders
+            - Or even make the whole thing a folder, distributed network style
+        - Or an AUTOSYNC feature
+            - Choose folders to auto sync or the whole pool
+- Folder support
+- Indicator for uploading (small indicator on the file tab?)
+- Offline access
+- Notifications
+- NAT checks
+- SSL
+- Mobile
+- Moderation
 
 - Desktop app and mobile app (IMPORTANT!)
     - Try to have some documentation for the more difficult to understand parts!
