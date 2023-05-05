@@ -1,0 +1,23 @@
+- QUIC
+    - https://github.com/quinn-rs/quinn
+    - Supports mutiplexing
+    - Need to configure heartbeat
+    - One connection allows for hole punching once?
+        - False, NAT mapping still needs to send to dest
+    - Need to test against new WebRTC-rs updates
+    - Need custom TLS logic apparently
+
+- Custom hole-punching:
+    - Need to be careful of Ipv4/Ipv6 (just need a flag differentiator)
+    - Use google stun servers for now
+        - Actaully probably no need?
+        - I don't know how remote port changes depending
+          on endpoint
+    - https://github.com/libp2p/specs/blob/master/relay/DCUtR.md
+        - My guess is use UDP for client "B" to send these packets
+          and then once connected, stop sending packets
+    - Possibly implement https://datatracker.ietf.org/doc/id/draft-takeda-symmetric-nat-traversal-00.txt
+
+- Checking NAT:
+    - https://docs.rs/stun-client/latest/stun_client/ 
+    - https://webrtchacks.com/symmetric-nat/

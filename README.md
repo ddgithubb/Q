@@ -1,7 +1,16 @@
 Test Site: http://pool-net-site-app.s3-website.ca-central-1.amazonaws.com/
 
+## What is it ##
+Pool Net is a data distribution application where unlimited data can be distributed across a large pool of devices
+
+## Highlights ##
+- Scalable without cost
+- Removes cost of data transfer through third party servers
+- End to End encrypted
+
+### Description ###
+
 - Welcome to the first test of Pool Net!
-- Pool Net is a data sharing application, where data is shared directly without ever passing a server
 - Pool Net uses a custom architecture which provides a strategy/algorithm to connect devices directly
     - The only server involved synchronizes devices within the "pool"
     - The only data being sent to that server is network information which is forwards to other devices
